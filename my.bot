@@ -1,0 +1,78 @@
+Моя ххх1
+доделать!!! - всё криво((( - не работает.
+import telebot
+
+exchanges = {
+    'доллар': 'USD',
+    'евро': 'EUR',
+    'рубль': 'RUB'
+}
+TOKEN = "6098190129:AAFdwj5xPPy0eWpNzzuHuf6cjFFCw1D1Lr0"
+
+bot = telebot.TeleBot(TOKEN)
+
+import json
+import requests
+from config import exchanges
+
+
+class APIException(Exception):
+    pass
+
+
+class Convertor:
+    @staticmethod
+    def get_price(base, sym, amount):
+        try:
+            base_key = exchanges[base.lower()]
+        except KeyError:
+            raise APIException(f"Валюта {base} не найдена!")
+
+        try:
+            sym_key = exchanges[sym.lower()]
+        except KeyError:
+            raise APIException(f"Валюта {sym} не найдена!")
+
+        if base_key == sym_key:
+            raise APIException(f'Невозможно перевести одинаковые валюты {base}!')
+
+        try:
+            amount = float(amount)
+        except ValueError:
+            raise APIException(f'Не удалось обработать количество {amount}!')
+
+        r = requests.get(f"https://api.exchangeratesapi.io/latest?base={base_key}&symbols={sym_key}")
+        resp = json.loads(r.content)
+        new_price = resp['rates'][sym_key] * amount
+        new_price = round(new_price, 3)
+        message = f"Цена {amount} {base} в {sym} : {new_price}"
+        return message
+
+
+@bot.message_handler(commands=['start'])
+def start(message: telebot.types.Message):
+    text = "Здравствуй, дорогой друг!"
+    bot.send_message(message.chat.id, text)
+
+@bot.message_handler(commands=['help'])
+def start(message: telebot.types.Message):
+    text = "Чем я могу тебе помочь? Я - бот, который поможет тебе узнать курс валют!)"
+    bot.send_message(message.chat.id, text)
+
+@bot.message_handler(commands=['values'])
+def values(message: telebot.types.Message):
+    text = 'Доступные валюты:'
+    for i in exchanges.keys():
+        text = '\n'.join((text, i))
+    bot.reply_to(message, text)
+
+bot.polling()
+
+@bot.message_handler(content_types=['text'])
+def converter(message: telebot.types.Message):
+        base, sym, amount = message.text.split()
+        r = requests.get(f"https://api.exchangeratesapi.io/latest?base={base}&symbols={sym}")
+        resp = json.loads(r.content)
+        new_price = resp['rates'][sym] * float(amount)
+        bot.reply_to(message, f"Цена {amount} {base} в {sym} : {new_price}")
+bot.polling()
